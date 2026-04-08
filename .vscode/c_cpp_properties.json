@@ -1,0 +1,42 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ],
+            "windowsSdkVersion": "10.0.26100.0",
+            "compilerPath": "cl.exe",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "windows-msvc-x64"
+        },
+        {
+            "name": "ESP32-C3 Supermini",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "C:\\Users\\Zestyy\\AppData\\Local\\Arduino15\\packages\\esp32\\hardware\\esp32\\3.3.7\\cores\\esp32",
+                "C:\\Users\\Zestyy\\AppData\\Local\\Arduino15\\packages\\esp32\\tools\\esp32c3-libs\\3.3.7\\include\\**",
+                "C:\\Users\\Zestyy\\AppData\\Local\\Arduino15\\packages\\esp32\\hardware\\esp32\\3.3.7\\libraries\\**",
+                "C:/Users/Zestyy/OneDrive - MMU/Documents/Arduino/libraries/**"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE",
+                "ARDUINO=10813"
+            ],
+            "windowsSdkVersion": "10.0.26100.0",
+            "compilerPath": "cl.exe",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "windows-msvc-x64"
+        }
+    ],
+    "version": 4
+}
