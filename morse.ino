@@ -17,7 +17,7 @@ static const String morseNumbers[] = {
 
 /*
   Gets the morse translation for a symbol in the ASCII table, if available.
-  @returns The morse translation if available, otherwise `NULL`.
+  @returns The morse translation if available, otherwise an empty string.
 */
 String getSymbolMorse(char symbol) {
   switch (symbol) {
@@ -57,5 +57,25 @@ String getSymbolMorse(char symbol) {
       return ".--.-.";
   }
 
-  return NULL;
+  return "";
+}
+
+/*
+  Attempts to get the morse code for an ASCII character. Includes letters of both cases, numbers and some symbols.
+  @returns The morse translation if available, otherwise an empty string.
+*/
+String getMorseForCharacter(char character) {
+  // Check letters first
+  if (character >= 65 && character <= 90) {
+    return morseLetters[character - 65];
+  }
+  else if (character >= 97 && character <= 122) {
+    return morseLetters[character - 97];
+  }
+  // Then numbers
+  else if (character >= 48 && character <= 57) {
+    return morseNumbers[character - 48];
+  }
+  // Then any other registered symbols
+  return getSymbolMorse(character);
 }

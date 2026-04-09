@@ -20,8 +20,6 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
-// Explicitly include to ensure that sketches are ordered correctly
-#include "morse.ino"
 
 const int SCREEN_WIDTH = 128;
 const int SCREEN_HEIGHT = 64;
@@ -109,10 +107,14 @@ void setup() {
   pinMode(buzzerPin, OUTPUT);
   digitalWrite(buzzerPin, LOW);  
 
+  animateWordDisplay(message, 3, 33);
+  delay(3000);
+  oled.clearDisplay();
+
 }
 
 void loop() { 
-  animateWordDisplay(message, 3, 33);
+  animateWordDisplay(getMorseForCharacter('S') + getMorseForCharacter('o') + getMorseForCharacter('1'), 3, 33);
   delay(3000);
   oled.clearDisplay();
 }
