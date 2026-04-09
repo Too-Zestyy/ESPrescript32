@@ -3,6 +3,9 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
+// Explicitly include to ensure that sketches are ordered correctly
+#include "morse.ino"
+
 const int SCREEN_WIDTH = 128;
 const int SCREEN_HEIGHT = 64;
 
@@ -11,7 +14,7 @@ Adafruit_SSD1306 oled(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 bool buzzerState = false;
 
 // TODO: Change to char[]
-String message = "_CLEAR_";
+String message = "_CLEAR._";
 
 const int ledPin = 8; 
 const int buzzerPin = 20;
