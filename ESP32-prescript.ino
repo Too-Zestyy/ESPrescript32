@@ -96,8 +96,82 @@ void animateWordDisplay(String word, int randomCharFlipCount, int charChangeDela
   } 
 }
 
-void setup() {
-  pinMode(buzzerPin, OUTPUT);
+// void setup() {
+//   pinMode(buzzerPin, OUTPUT);
+//   Wire.begin(6, 8);
+//   oled.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+//   // oled.setFont();
+//   oled.setTextSize(2);
+//   oled.setTextColor(WHITE);
+//   oled.clearDisplay();
+//   pinMode(buzzerPin, OUTPUT);
+//   digitalWrite(buzzerPin, LOW);  
+
+//   animateWordDisplay(message, 3, 33);
+//   delay(3000);
+//   oled.clearDisplay();
+
+// }
+
+// void loop() { 
+//   animateWordDisplay(getMorseForCharacter('S') + getMorseForCharacter('o') + getMorseForCharacter('1'), 3, 33);
+//   delay(3000);
+//   oled.clearDisplay();
+// }
+
+#include <BLEDevice.h>
+#include <BLEUtils.h>
+#include <BLEServer.h>
+
+// See the following for generating UUIDs:
+// https://www.uuidgenerator.net/
+
+#define SERVICE_UUID        "60acc2f2-601b-4c01-aebf-59fe16a578d5"
+#define CHARACTERISTIC_UUID "9c3cd6b8-5e8f-442d-aff0-87cb8177c43f"
+
+/* BLEServer *pServer = BLEDevice::createServer();
+BLEService *pService = pServer->createService(SERVICE_UUID);
+BLECharacteristic *pCharacteristic = pService->createCharacteristic(
+                                         CHARACTERISTIC_UUID,
+                                         BLECharacteristic::PROPERTY_READ |
+                                         BLECharacteristic::PROPERTY_WRITE
+                                       ); */
+
+BLEServer *pServer;
+BLEService *pService;
+BLECharacteristic *pCharacteristic;
+
+BLEService *deviceVersionService;
+
+
+class PrescriptMessageCallbacks: public BLECharacteristicCallbacks
+{
+  void onWrite(BLECharacteristic *pCharacteristic)
+  {
+    String value = pCharacteristic->getValue();
+
+    if (value.length() > 0)
+    {
+      animateWordDisplay(value, 3, 33);
+
+      // Serial.println("*********");
+      // Serial.print("New value: ");
+      // for (int i = 0; i < value.length(); i++)
+      // {
+      //   Serial.print(value[i]);
+      // }
+
+      // Serial.println();
+      // Serial.println("*********");
+    }
+  }
+};
+
+
+void setup()
+{
+  Serial.begin(115200);
+  Serial.println("Starting BLE Server!");
   Wire.begin(6, 8);
   oled.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   // oled.setFont();
@@ -107,14 +181,63 @@ void setup() {
   pinMode(buzzerPin, OUTPUT);
   digitalWrite(buzzerPin, LOW);  
 
+  BLEDevice::init("Prescript of The Index");
+  pServer = BLEDevice::createServer();
+
+  // deviceVersionService = pServer->createService(0x1200);
+  // deviceVersionCharacteristic = deviceVersionService->createCharacteristic(
+  //   0x0203,
+  //   BLECharacteristic::PROPERTY_READ
+  // );
+  // deviceVersionCharacteristic->setValue(1);
+  // deviceVersionService->start();
+
+  
+  pService = pServer->createService(SERVICE_UUID);
+  pCharacteristic = pService->createCharacteristic(
+                                         CHARACTERISTIC_UUID,
+                                         BLECharacteristic::PROPERTY_READ |
+                                         BLECharacteristic::PROPERTY_WRITE
+                                       );
+  // BLEDescriptor desc = bmeHumidityDescriptor(BLEUUID((uint16_t)0x2903));
+  // TODO
+  // pCharacteristic->addDescriptor("Description for this service");
+
+  
+  /* BLEServer *pServer = BLEDevice::createServer();
+  BLEService *pService = pServer->createService(SERVICE_UUID);
+  BLECharacteristic *pCharacteristic = pService->createCharacteristic(
+                                         CHARACTERISTIC_UUID,
+                                         BLECharacteristic::PROPERTY_READ |
+                                         BLECharacteristic::PROPERTY_WRITE
+                                       );*/
+
+  pCharacteristic->setCallbacks(new PrescriptMessageCallbacks());
+  pCharacteristic->setValue("Hello, Hermes.");
+  pService->start();
+
+
+
+  //BLEAdvertising *pAdvertising = pServer->getAdvertising();
+  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+  pAdvertising->addServiceUUID(SERVICE_UUID);
+  pAdvertising->setScanResponse(true);
+  pAdvertising->setMinPreferred(0x06);  // functions that help with iPhone connections issue
+  pAdvertising->setMinPreferred(0x12);
+  BLEDevice::startAdvertising();
+  pAdvertising->start();
+  Serial.println("Characteristic defined! Now you can read it in the Client!");
+
+
   animateWordDisplay(message, 3, 33);
   delay(3000);
   oled.clearDisplay();
-
 }
 
-void loop() { 
-  animateWordDisplay(getMorseForCharacter('S') + getMorseForCharacter('o') + getMorseForCharacter('1'), 3, 33);
-  delay(3000);
-  oled.clearDisplay();
+void loop()
+{
+  // String value = pCharacteristic->getValue();
+  // Serial.print("The new characteristic value is: ");
+  // Serial.println(value.c_str());
+  delay(2000);
 }
