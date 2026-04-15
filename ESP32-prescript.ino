@@ -24,6 +24,19 @@
 const int SCREEN_WIDTH = 128;
 const int SCREEN_HEIGHT = 64;
 
+const int MAX_CHARS_ON_SCREEN_WITH_NULL_TERMINATOR = ((SCREEN_WIDTH * SCREEN_HEIGHT) / (8 * 8)) + 1;
+
+// Buffer with the ability to hold characters for an 8*8 font filling the entire screen with null terminator. To be used for full prescripts.
+char prescriptBuf[MAX_CHARS_ON_SCREEN_WITH_NULL_TERMINATOR]    = {0};
+
+// Expected to be used for the current message to display when 'writing' a prescript
+char curPrescriptBuf[MAX_CHARS_ON_SCREEN_WITH_NULL_TERMINATOR] = {0};
+
+const int MAX_PRESCRIPT_SIZE = sizeof(prescriptBuf) - sizeof(prescriptBuf[0]); // Exclude null terminator at end of array from being written to
+
+// Buffer holding passkey characters plus null termination
+char passkeyBuf[6 + 1] = {0};
+
 
 const int MORSE_TIME_UNIT_MS            = 25;
 const int MORSE_DOT_TIME                = MORSE_TIME_UNIT_MS;
@@ -102,29 +115,43 @@ void animateWordDisplay(String word, int randomCharFlipCount, int charChangeDela
   } 
 }
 
-void displayPrescript(String name, String prescript, bool buzzMorse) {
-  oled.setTextSize(1);
-  String formattedPrescript = "[To " + name + ']' + '\n' + '\n' + '[' + prescript + ']';
+/*
+  Formats and displays a `prescript` addressed to `name`, using `prescriptBuf` and `curPrescriptBuf` as storage for the state of the function.
+  A maximum of `MAX_PRESCRIPT_SIZE` can be attempted to be displayed by this function. 
+  This prevents memory overflow, but *does not* prevent overflow of the display area due to formatting.
 
-  int prescriptLength = formattedPrescript.length();
-  char curPrescriptMessage[formattedPrescript.length() + 1] = {0};
-  curPrescriptMessage[0] = '_';
+  @param name The name of the entity to address the prescript to.
+  @param prescript The task to be carried out by the entity.
+  @param buzzMorse Whether the morse code for the message should be sent to the digital output pin for the buzzer/LED.
+*/
+void displayPrescriptFromCharBufs(const char* name, const char* prescript, bool buzzMorse) {
+  oled.setTextSize(1);
+
+  snprintf(
+    prescriptBuf, 
+    MAX_PRESCRIPT_SIZE, // Exclude null terminator at end of array from being written to
+    "[To %s]\n\n[%s]", name, prescript
+  );
+  // char curPrescriptMessage[formattedPrescript.length() + 1] = {0};
+
+  int prescriptLength = strlen(prescriptBuf);
+  curPrescriptBuf[0] = '_';
 
   for (int i = 0; i < prescriptLength; i++) {
-    curPrescriptMessage[i] = formattedPrescript[i];
+    curPrescriptBuf[i] = prescriptBuf[i];
     // Keep the null terminator for the last character and 'remove' the 'cursor'
     if (i != prescriptLength - 1) {
-      curPrescriptMessage[i + 1] = '_';
+      curPrescriptBuf[i + 1] = '_';
     }
 
     // Draw currently displayed section of prescript to screen
     oled.clearDisplay();
     oled.setCursor(0, 0);
-    oled.print(curPrescriptMessage);
+    oled.print(curPrescriptBuf);
     oled.display();
 
     if (buzzMorse) {
-      switch (curPrescriptMessage[i]) {
+      switch (curPrescriptBuf[i]) {
         // Spaces assumed to be word boundary
         case ' ':
           delay(MORSE_WORD_GAP_TIME);
@@ -135,7 +162,7 @@ void displayPrescript(String name, String prescript, bool buzzMorse) {
           break;
         // Beep morse code representing the current character, if found.
         default:
-          digitalBeepAsciiChar(curPrescriptMessage[i], buzzerPin);
+          digitalBeepAsciiChar(curPrescriptBuf[i], buzzerPin);
           // Add uniform break between letters
           delay(MORSE_DASH_TIME);
       }
@@ -147,6 +174,18 @@ void displayPrescript(String name, String prescript, bool buzzMorse) {
     
   }
 
+  memset(prescriptBuf, 0, sizeof(prescriptBuf));
+  memset(curPrescriptBuf, 0, sizeof(curPrescriptBuf));
+
+}
+
+
+/*
+  A helper function for `displayPrescriptFromCharBufs` to simplify using Strings. 
+  Intended for callbacks from the BLE stack, where text is stored in such a manner.
+*/
+void displayPrescript(String name, String prescript, bool buzzMorse) {
+  return displayPrescriptFromCharBufs(name.c_str(), prescript.c_str(), buzzMorse);
 }
 
 // void setup() {
@@ -210,6 +249,27 @@ class PrescriptMessageCallbacks: public BLECharacteristicCallbacks
   }
 };
 
+// void display_pairing_code(uint32_t passkey) {
+//   snsprintf(passkeyBuf, sizeof(passkeyBuf), "%u", passkey);
+//   drawCentredChars(passkeyBuf, 2);
+// }
+
+// void gap_event_handler(esp_gap_ble_cb_event_t event, 
+//                        esp_ble_gap_cb_param_t *param) {
+//     switch(event) {
+//         case ESP_GAP_BLE_NC_REQ_EVT:
+//             // 6-digit PIN appears on both screens
+//             uint32_t passkey = param->ble_security.key_notif.passkey;
+
+//             // Display on device screen
+//             display_pairing_code(passkey);
+
+//             // User must confirm match on both devices
+//             esp_ble_confirm_reply(param->ble_security.ble_req.bd_addr, true);
+//             break;
+//     }
+// }
+
 
 void setup()
 {
@@ -222,19 +282,13 @@ void setup()
   oled.setTextColor(WHITE);
   oled.clearDisplay();
   pinMode(buzzerPin, OUTPUT);
-  digitalWrite(buzzerPin, LOW);  
+  digitalWrite(buzzerPin, LOW); 
+
+  // esp_ble_gap_set_security_param(ESP_BLE_SM_AUTHEN_REQ_MODE, 
+  //                               &ESP_LE_AUTH_REQ_SC_MITM_BOND, sizeof(uint8_t)); 
 
   BLEDevice::init("Prescript of The Index");
   pServer = BLEDevice::createServer();
-
-  // deviceVersionService = pServer->createService(0x1200);
-  // deviceVersionCharacteristic = deviceVersionService->createCharacteristic(
-  //   0x0203,
-  //   BLECharacteristic::PROPERTY_READ
-  // );
-  // deviceVersionCharacteristic->setValue(1);
-  // deviceVersionService->start();
-
   
   pService = pServer->createService(SERVICE_UUID);
   pCharacteristic = pService->createCharacteristic(
@@ -275,7 +329,9 @@ void setup()
   animateWordDisplay(message, 3, 33);
   delay(3000);
   
-  displayPrescript("Vi", "This is your first prescript.", false);
+  displayPrescript("Proselyte", "Drink only orange juice for the next 28 days. Completion will result in promotion to proxy.", true);
+  delay(5000);
+  displayPrescript("Proxy", "Stay at home for the next 8 hours. Congratulations on your promotion.", true);
 }
 
 void loop()
