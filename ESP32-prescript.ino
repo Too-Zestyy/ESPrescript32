@@ -124,19 +124,25 @@ void displayPrescript(String name, String prescript, bool buzzMorse) {
     oled.display();
 
     if (buzzMorse) {
-      // Beep morse representation for characters
-      if (curPrescriptMessage[i] != ' ') {
-        digitalBeepAsciiChar(curPrescriptMessage[i], buzzerPin);
-      }
-      // Spaces assumed to be word boundary
-      else {
-        digitalWrite(buzzerPin, HIGH);
-        delay(MORSE_WORD_GAP_TIME);
-        digitalWrite(buzzerPin, LOW);
+      switch (curPrescriptMessage[i]) {
+        // Spaces assumed to be word boundary
+        case ' ':
+          delay(MORSE_WORD_GAP_TIME);
+          break;
+        // Allows time for the cursor to move in a visible animation for newlines
+        case '\n':
+          delay(MORSE_DOT_TIME);
+          break;
+        // Beep morse code representing the current character, if found.
+        default:
+          digitalBeepAsciiChar(curPrescriptMessage[i], buzzerPin);
+          // Add uniform break between letters
+          delay(MORSE_DASH_TIME);
       }
     }
     else {
-      delay(66);
+      // Keep typing timing consistent with units used when morse code is buzzed
+      delay(MORSE_DASH_TIME);
     }
     
   }
@@ -200,16 +206,6 @@ class PrescriptMessageCallbacks: public BLECharacteristicCallbacks
     if (value.length() > 0)
     {
       animateWordDisplay(value, 3, 33);
-
-      // Serial.println("*********");
-      // Serial.print("New value: ");
-      // for (int i = 0; i < value.length(); i++)
-      // {
-      //   Serial.print(value[i]);
-      // }
-
-      // Serial.println();
-      // Serial.println("*********");
     }
   }
 };

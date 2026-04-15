@@ -101,20 +101,13 @@ void digitalBeepAsciiChar(char character, int buzzerPin) {
   String morse = getMorseForCharacter(character);
 
   if (morse != "") {
-    for (char morseCharacter : morse) {
-      digitalBeepMorseChar(morseCharacter, buzzerPin);
-      delay(MORSE_DOT_TIME);
+    for (int i = 0; i < morse.length(); i++) {
+      digitalBeepMorseChar(morse[i], buzzerPin);
+      // Prevent a delay after the morse code for the letter has completely sounded
+      if (i < morse.length() - 1) {
+        delay(MORSE_DOT_TIME);
+      }
     }
   }
 
 }
-
-// void digitalBeepString(String string, int buzzerPin) {
-//   String[] words = string.split(' ');
-
-  
-
-//   for (var character in string) {
-//     digitalBeepAsciiChar(character, buzzerPin);
-//   }
-// }
