@@ -24,6 +24,13 @@
 const int SCREEN_WIDTH = 128;
 const int SCREEN_HEIGHT = 64;
 
+
+const int MORSE_TIME_UNIT_MS            = 25;
+const int MORSE_DOT_TIME                = MORSE_TIME_UNIT_MS;
+const int MORSE_DASH_TIME               = MORSE_TIME_UNIT_MS * 3;
+const int MORSE_WORD_GAP_TIME           = MORSE_TIME_UNIT_MS * 7;
+const int MORSE_WORD_GAP_MINUS_DOT_TIME = MORSE_WORD_GAP_TIME - MORSE_DOT_TIME;
+
 Adafruit_SSD1306 oled(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 bool buzzerState = false;
@@ -67,8 +74,7 @@ void animateWordDisplay(String word, int randomCharFlipCount, int charChangeDela
   unsigned int bufLen = word.length();
 
   // Allocate length of string plus constant null termination for use by OLED library to see end of string
-  char displayBuf[bufLen + 1];
-  displayBuf[bufLen] = 0;
+  char displayBuf[bufLen + 1] = {0};
 
   for (unsigned int i = 0; i < bufLen; i++) {
     displayBuf[i] = getRandomDisplayableChar();
@@ -94,6 +100,47 @@ void animateWordDisplay(String word, int randomCharFlipCount, int charChangeDela
     drawCentredChars(displayBuf, 2);
     oled.display();
   } 
+}
+
+void displayPrescript(String name, String prescript, bool buzzMorse) {
+  oled.setTextSize(1);
+  String formattedPrescript = "[To " + name + ']' + '\n' + '\n' + '[' + prescript + ']';
+
+  int prescriptLength = formattedPrescript.length();
+  char curPrescriptMessage[formattedPrescript.length() + 1] = {0};
+  curPrescriptMessage[0] = '_';
+
+  for (int i = 0; i < prescriptLength; i++) {
+    curPrescriptMessage[i] = formattedPrescript[i];
+    // Keep the null terminator for the last character and 'remove' the 'cursor'
+    if (i != prescriptLength - 1) {
+      curPrescriptMessage[i + 1] = '_';
+    }
+
+    // Draw currently displayed section of prescript to screen
+    oled.clearDisplay();
+    oled.setCursor(0, 0);
+    oled.print(curPrescriptMessage);
+    oled.display();
+
+    if (buzzMorse) {
+      // Beep morse representation for characters
+      if (curPrescriptMessage[i] != ' ') {
+        digitalBeepAsciiChar(curPrescriptMessage[i], buzzerPin);
+      }
+      // Spaces assumed to be word boundary
+      else {
+        digitalWrite(buzzerPin, HIGH);
+        delay(MORSE_WORD_GAP_TIME);
+        digitalWrite(buzzerPin, LOW);
+      }
+    }
+    else {
+      delay(66);
+    }
+    
+  }
+
 }
 
 // void setup() {
@@ -231,7 +278,8 @@ void setup()
 
   animateWordDisplay(message, 3, 33);
   delay(3000);
-  oled.clearDisplay();
+  
+  displayPrescript("Vi", "This is your first prescript.", false);
 }
 
 void loop()

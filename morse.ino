@@ -79,3 +79,42 @@ String getMorseForCharacter(char character) {
   // Then any other registered symbols
   return getSymbolMorse(character);
 }
+
+/*
+  Sounds an active buzzer connected via `buzzerPin`
+*/
+void digitalBeepMorseChar(char morseCharacter, int buzzerPin) {
+  digitalWrite(buzzerPin, HIGH);
+
+  switch (morseCharacter) {
+    case '.':
+      delay(MORSE_DOT_TIME);
+    case '-':
+      delay(MORSE_DASH_TIME);
+  }
+
+  digitalWrite(buzzerPin, LOW);
+  // delay(MORSE_SHORT);
+}
+
+void digitalBeepAsciiChar(char character, int buzzerPin) {
+  String morse = getMorseForCharacter(character);
+
+  if (morse != "") {
+    for (char morseCharacter : morse) {
+      digitalBeepMorseChar(morseCharacter, buzzerPin);
+      delay(MORSE_DOT_TIME);
+    }
+  }
+
+}
+
+// void digitalBeepString(String string, int buzzerPin) {
+//   String[] words = string.split(' ');
+
+  
+
+//   for (var character in string) {
+//     digitalBeepAsciiChar(character, buzzerPin);
+//   }
+// }
