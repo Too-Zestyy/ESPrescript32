@@ -19,6 +19,9 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <BLEDevice.h>
+#include <BLEUtils.h>
+#include <BLEServer.h>
 
 
 const int SCREEN_WIDTH = 128;
@@ -89,6 +92,13 @@ const int buzzerPin = 20;
 
 
 /*
+  =================================
+  | OLED Text Rendering Functions |
+  =================================
+*/
+
+
+/*
   Gets a random ASCII character that is displayable using a standard font.
 */
 char getRandomDisplayableChar() {
@@ -131,9 +141,6 @@ void animateWordDisplay(String word, int randomCharFlipCount, int charChangeDela
       delay(charChangeDelayMs);
       displayBuf[i] = getRandomDisplayableChar();
       oled.clearDisplay();
-      // oled.setCursor(0, 0);
-      // oled.setCursor(20, 20);
-      // oled.print(displayBuf);
       drawCentredChars(displayBuf, 2);
       
       oled.display();
@@ -141,8 +148,6 @@ void animateWordDisplay(String word, int randomCharFlipCount, int charChangeDela
     delay(charChangeDelayMs);
     displayBuf[i] = word[i];
     oled.clearDisplay();
-    // oled.setCursor(20, 20);
-    // oled.print(displayBuf);
     drawCentredChars(displayBuf, 2);
     oled.display();
   } 
@@ -165,7 +170,6 @@ void displayPrescriptFromCharBufs(const char* name, const char* prescript, bool 
     MAX_PRESCRIPT_SIZE, // Exclude null terminator at end of array from being written to
     "[To %s]\n\n[%s]", name, prescript
   );
-  // char curPrescriptMessage[formattedPrescript.length() + 1] = {0};
 
   int prescriptLength = strlen(prescriptBuf);
   curPrescriptBuf[0] = '_';
@@ -221,36 +225,6 @@ void displayPrescript(String name, String prescript, bool buzzMorse) {
   return displayPrescriptFromCharBufs(name.c_str(), prescript.c_str(), buzzMorse);
 }
 
-// void setup() {
-//   pinMode(buzzerPin, OUTPUT);
-//   Wire.begin(6, 8);
-//   oled.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-//   // oled.setFont();
-//   oled.setTextSize(2);
-//   oled.setTextColor(WHITE);
-//   oled.clearDisplay();
-//   pinMode(buzzerPin, OUTPUT);
-//   digitalWrite(buzzerPin, LOW);  
-
-//   animateWordDisplay(message, 3, 33);
-//   delay(3000);
-//   oled.clearDisplay();
-
-// }
-
-// void loop() { 
-//   animateWordDisplay(getMorseForCharacter('S') + getMorseForCharacter('o') + getMorseForCharacter('1'), 3, 33);
-//   delay(3000);
-//   oled.clearDisplay();
-// }
-
-#include <BLEDevice.h>
-#include <BLEUtils.h>
-#include <BLEServer.h>
-
-// See the following for generating UUIDs:
-// https://www.uuidgenerator.net/
-
 
 /*
   =================
@@ -290,28 +264,11 @@ class PrescriptTaskRecipientCallbacks: public BLECharacteristicCallbacks
 
     memcpy(prescriptRecipientBuf, value.c_str(), textSize);
 
-    // for (unsigned int i = 0; i < sizeof(prescriptRecipientBuf); i++) {
-    //   if (value[i] == 0) {break;}
-    //   prescriptRecipientBuf[i] = value[i];
-    // }
-
     if (needEllipse) {
       for (int i = sizeof(prescriptRecipientBuf) - 2; i > sizeof(prescriptRecipientBuf) - 4; i--) {
         prescriptRecipientBuf[i] = '.';
       }
     }
-
-
-    
-
-    // Copy the recipient name as far as possible
-    // snprintf(prescriptRecipientBuf, sizeof(prescriptRecipientBuf) - sizeof(prescriptRecipientBuf[0]), "%s", value);
-    // Replace the last three characters with an ellipse if the name does not fit
-    // if (value.length() >= sizeof(prescriptRecipientBuf)) {
-    //   for (int i = sizeof(prescriptRecipientBuf) - 2; i > sizeof(prescriptRecipientBuf) - 4; i--) {
-    //     prescriptRecipientBuf[i] = '.';
-    //   }
-    // }
   }
 };
 
@@ -350,13 +307,11 @@ class PrescriptBehaviourTriggerCallbacks: public BLECharacteristicCallbacks
   }
 };
 
-/* BLEServer *pServer = BLEDevice::createServer();
-BLEService *bleCentredMessageService = pServer->createService(CENTRED_MESSAGE_SERVICE_UUID);
-BLECharacteristic *bleCentredMessageChracteristic = bleCentredMessageService->createCharacteristic(
-                                         CENTRED_MESSAGE_CHARACTERISTIC_UUID,
-                                         BLECharacteristic::PROPERTY_READ |
-                                         BLECharacteristic::PROPERTY_WRITE
-                                       ); */
+/*
+  ================================
+  | BLE Component pre-allocation |
+  ================================
+*/
 
 BLEServer *pServer;
 
@@ -475,18 +430,6 @@ void setup()
                                        );
   blePrescriptTriggerChracteristic->setCallbacks(new PrescriptBehaviourTriggerCallbacks());
   bleTriggerService->start();
-  // BLEDescriptor desc = bmeHumidityDescriptor(BLEUUID((uint16_t)0x2903));
-  // TODO
-  // bleCentredMessageChracteristic->addDescriptor("Description for this service");
-
-  
-  /* BLEServer *pServer = BLEDevice::createServer();
-  BLEService *bleCentredMessageService = pServer->createService(CENTRED_MESSAGE_SERVICE_UUID);
-  BLECharacteristic *bleCentredMessageChracteristic = bleCentredMessageService->createCharacteristic(
-                                         CENTRED_MESSAGE_CHARACTERISTIC_UUID,
-                                         BLECharacteristic::PROPERTY_READ |
-                                         BLECharacteristic::PROPERTY_WRITE
-                                       );*/
 
 
 
@@ -499,17 +442,9 @@ void setup()
   pAdvertising->setMinPreferred(0x12);
   BLEDevice::startAdvertising();
   pAdvertising->start();
-  // Serial.println("Characteristic defined! Now you can read it in the Client!");
-  
-  // displayPrescript("Proselyte", "Drink only orange juice for the next 28 days. Completion will result in promotion to proxy.", true);
-  // delay(5000);
-  // displayPrescript("Proxy", "Stay at home for the next 8 hours. Congratulations on your promotion.", true);
 }
 
 void loop()
 {
-  // String value = bleCentredMessageChracteristic->getValue();
-  // Serial.print("The new characteristic value is: ");
-  // Serial.println(value.c_str());
   delay(100);
 }
