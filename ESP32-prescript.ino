@@ -24,7 +24,40 @@
 const int SCREEN_WIDTH = 128;
 const int SCREEN_HEIGHT = 64;
 
-const int MAX_CHARS_ON_SCREEN_WITH_NULL_TERMINATOR = ((SCREEN_WIDTH * SCREEN_HEIGHT) / (8 * 8)) + 1;
+const int FONT_SIZE = 8;
+
+const int MAX_CHARS_ON_SCREEN_WITH_NULL_TERMINATOR = ((SCREEN_WIDTH * SCREEN_HEIGHT) / (FONT_SIZE * FONT_SIZE)) + 1;
+
+const int LINES_ON_SCREEN = SCREEN_HEIGHT / FONT_SIZE;
+
+/*
+  ========================
+  | Prescript Components |
+  ========================
+*/ 
+
+// TODO: Rework calculations to ensure reaching the end of the screen (check default font size)
+
+/*
+  Represents the number of characters that can be displayed on a line 
+  within the current OLED without overflowing to the next line.
+*/
+const int MAX_CHARS_PER_SCREEN_LINE_FONT_SIZE_ONE = 128 / FONT_SIZE;
+
+// Buffer holding the recipient of the current prescript, minus the already known characters due to formatting.
+char prescriptRecipientBuf[(MAX_CHARS_PER_SCREEN_LINE_FONT_SIZE_ONE + 1) - 4] = {0};
+
+/*
+  Buffer holding the prescript task for the recipient. 
+  Able to hold all characters after 2 lines reserved for the recipient without formatting reservations.
+*/
+char prescriptBodyBuf[(MAX_CHARS_PER_SCREEN_LINE_FONT_SIZE_ONE * (LINES_ON_SCREEN - 2)) + 1] = {0};
+
+/*
+  =======================
+  | Prescript Rendering |
+  =======================
+*/ 
 
 // Buffer with the ability to hold characters for an 8*8 font filling the entire screen with null terminator. To be used for full prescripts.
 char prescriptBuf[MAX_CHARS_ON_SCREEN_WITH_NULL_TERMINATOR]    = {0};
@@ -218,29 +251,18 @@ void displayPrescript(String name, String prescript, bool buzzMorse) {
 // See the following for generating UUIDs:
 // https://www.uuidgenerator.net/
 
-#define SERVICE_UUID        "60acc2f2-601b-4c01-aebf-59fe16a578d5"
-#define CHARACTERISTIC_UUID "9c3cd6b8-5e8f-442d-aff0-87cb8177c43f"
 
-/* BLEServer *pServer = BLEDevice::createServer();
-BLEService *pService = pServer->createService(SERVICE_UUID);
-BLECharacteristic *pCharacteristic = pService->createCharacteristic(
-                                         CHARACTERISTIC_UUID,
-                                         BLECharacteristic::PROPERTY_READ |
-                                         BLECharacteristic::PROPERTY_WRITE
-                                       ); */
-
-BLEServer *pServer;
-BLEService *pService;
-BLECharacteristic *pCharacteristic;
-
-BLEService *deviceVersionService;
-
+/*
+  =================
+  | BLE Callbacks |
+  =================
+*/
 
 class PrescriptMessageCallbacks: public BLECharacteristicCallbacks
 {
-  void onWrite(BLECharacteristic *pCharacteristic)
+  void onWrite(BLECharacteristic *bleCentredMessageChracteristic)
   {
-    String value = pCharacteristic->getValue();
+    String value = bleCentredMessageChracteristic->getValue();
 
     if (value.length() > 0)
     {
@@ -248,6 +270,111 @@ class PrescriptMessageCallbacks: public BLECharacteristicCallbacks
     }
   }
 };
+
+// TODO: Refactor component buffer wrties for recipient and body into separate function
+
+class PrescriptTaskRecipientCallbacks: public BLECharacteristicCallbacks
+{
+  void onWrite(BLECharacteristic *bleCentredMessageChracteristic)
+  {
+    String value = bleCentredMessageChracteristic->getValue();
+    memset(prescriptRecipientBuf, 0, sizeof(prescriptRecipientBuf));
+
+    bool needEllipse = false;
+
+    int textSize = value.length();
+    if (textSize >= sizeof(prescriptRecipientBuf)) {
+      textSize = sizeof(prescriptRecipientBuf) - sizeof(prescriptRecipientBuf[0]);
+      needEllipse = true;
+    }
+
+    memcpy(prescriptRecipientBuf, value.c_str(), textSize);
+
+    // for (unsigned int i = 0; i < sizeof(prescriptRecipientBuf); i++) {
+    //   if (value[i] == 0) {break;}
+    //   prescriptRecipientBuf[i] = value[i];
+    // }
+
+    if (needEllipse) {
+      for (int i = sizeof(prescriptRecipientBuf) - 2; i > sizeof(prescriptRecipientBuf) - 4; i--) {
+        prescriptRecipientBuf[i] = '.';
+      }
+    }
+
+
+    
+
+    // Copy the recipient name as far as possible
+    // snprintf(prescriptRecipientBuf, sizeof(prescriptRecipientBuf) - sizeof(prescriptRecipientBuf[0]), "%s", value);
+    // Replace the last three characters with an ellipse if the name does not fit
+    // if (value.length() >= sizeof(prescriptRecipientBuf)) {
+    //   for (int i = sizeof(prescriptRecipientBuf) - 2; i > sizeof(prescriptRecipientBuf) - 4; i--) {
+    //     prescriptRecipientBuf[i] = '.';
+    //   }
+    // }
+  }
+};
+
+
+// TODO: Add buffer for target name to then use within this callback
+class PrescriptTaskBodyCallbacks: public BLECharacteristicCallbacks
+{
+  void onWrite(BLECharacteristic *bleCentredMessageChracteristic)
+  {
+    String value = bleCentredMessageChracteristic->getValue();
+    memset(prescriptBodyBuf, 0, sizeof(prescriptBodyBuf));
+
+    bool needEllipse = false;
+
+    int textSize = value.length();
+    if (textSize >= sizeof(prescriptBodyBuf)) {
+      textSize = sizeof(prescriptBodyBuf) - sizeof(prescriptBodyBuf[0]);
+      needEllipse = true;
+    }
+
+    memcpy(prescriptBodyBuf, value.c_str(), textSize);
+
+    if (needEllipse) {
+      for (int i = sizeof(prescriptBodyBuf) - 2; i > sizeof(prescriptBodyBuf) - 4; i--) {
+        prescriptBodyBuf[i] = '.';
+      }
+    }
+  }
+};
+
+class PrescriptBehaviourTriggerCallbacks: public BLECharacteristicCallbacks
+{
+  void onWrite(BLECharacteristic *bleCentredMessageChracteristic)
+  {
+    displayPrescriptFromCharBufs(prescriptRecipientBuf, prescriptBodyBuf, true);
+  }
+};
+
+/* BLEServer *pServer = BLEDevice::createServer();
+BLEService *bleCentredMessageService = pServer->createService(CENTRED_MESSAGE_SERVICE_UUID);
+BLECharacteristic *bleCentredMessageChracteristic = bleCentredMessageService->createCharacteristic(
+                                         CENTRED_MESSAGE_CHARACTERISTIC_UUID,
+                                         BLECharacteristic::PROPERTY_READ |
+                                         BLECharacteristic::PROPERTY_WRITE
+                                       ); */
+
+BLEServer *pServer;
+
+
+BLEService *bleCentredMessageService;
+BLECharacteristic *bleCentredMessageChracteristic;
+
+
+BLEService *blePrescriptService;
+BLECharacteristic *blePrescriptRecipientChracteristic;
+BLECharacteristic *blePrescriptBodyChracteristic;
+
+
+BLEService *bleTriggerService;
+BLECharacteristic *blePrescriptTriggerChracteristic;
+
+
+BLEService *deviceVersionService;
 
 // void display_pairing_code(uint32_t passkey) {
 //   snsprintf(passkeyBuf, sizeof(passkeyBuf), "%u", passkey);
@@ -270,6 +397,21 @@ class PrescriptMessageCallbacks: public BLECharacteristicCallbacks
 //     }
 // }
 
+/*
+  ======================================
+  | BLE Service + Characteristic UUIDs |
+  ======================================
+*/
+
+#define CENTRED_MESSAGE_SERVICE_UUID        "60acc2f2-601b-4c01-aebf-59fe16a578d5"
+#define CENTRED_MESSAGE_CHARACTERISTIC_UUID "9c3cd6b8-5e8f-442d-aff0-87cb8177c43f"
+
+#define PRESCRIPT_SERVICE_UUID                  "3957c02d-314c-4577-9997-fade555fa379"
+#define PRESCRIPT_RECIPIENT_CHARACTERISTIC_UUID "e9c6f69f-7bd8-4e91-9c3e-8b3da89f38a0"
+#define PRESCRIPT_BODY_CHARACTERISTIC_UUID      "7200e2c1-5fa2-48f2-85bc-11082c4cdfbe"
+
+#define BEHAVIOUR_TRIGGER_SERVICE_UUID                  "e1d11d62-b8c8-4c3a-a501-ee8a70257ce6"
+#define BEHAVIOUR_PRESCRIPT_TRIGGER_CHARACTERISTIC_UUID "c00c244d-fdeb-4090-b35a-00c68f1e13bc"
 
 void setup()
 {
@@ -284,60 +426,90 @@ void setup()
   pinMode(buzzerPin, OUTPUT);
   digitalWrite(buzzerPin, LOW); 
 
+  animateWordDisplay(message, 3, 33);
+  delay(3000);
+
   // esp_ble_gap_set_security_param(ESP_BLE_SM_AUTHEN_REQ_MODE, 
   //                               &ESP_LE_AUTH_REQ_SC_MITM_BOND, sizeof(uint8_t)); 
 
   BLEDevice::init("Prescript of The Index");
   pServer = BLEDevice::createServer();
   
-  pService = pServer->createService(SERVICE_UUID);
-  pCharacteristic = pService->createCharacteristic(
-                                         CHARACTERISTIC_UUID,
+  bleCentredMessageService = pServer->createService(CENTRED_MESSAGE_SERVICE_UUID);
+  bleCentredMessageChracteristic = bleCentredMessageService->createCharacteristic(
+                                         CENTRED_MESSAGE_CHARACTERISTIC_UUID,
                                          BLECharacteristic::PROPERTY_READ |
                                          BLECharacteristic::PROPERTY_WRITE
                                        );
+  bleCentredMessageChracteristic->setCallbacks(new PrescriptMessageCallbacks());
+  bleCentredMessageChracteristic->setValue("Hello, Hermes.");
+  bleCentredMessageService->start();
+
+
+
+  blePrescriptService = pServer->createService(PRESCRIPT_SERVICE_UUID);
+  blePrescriptRecipientChracteristic = blePrescriptService->createCharacteristic(
+                                         PRESCRIPT_RECIPIENT_CHARACTERISTIC_UUID,
+                                         BLECharacteristic::PROPERTY_READ |
+                                         BLECharacteristic::PROPERTY_WRITE
+                                       );
+  blePrescriptRecipientChracteristic->setCallbacks(new PrescriptTaskRecipientCallbacks());
+  blePrescriptRecipientChracteristic->setValue("Prescript Recipient");
+
+  blePrescriptBodyChracteristic = blePrescriptService->createCharacteristic(
+                                         PRESCRIPT_BODY_CHARACTERISTIC_UUID,
+                                         BLECharacteristic::PROPERTY_READ |
+                                         BLECharacteristic::PROPERTY_WRITE
+                                       );
+  blePrescriptBodyChracteristic->setCallbacks(new PrescriptTaskBodyCallbacks());
+  blePrescriptBodyChracteristic->setValue("Prescript Body");
+  blePrescriptService->start();
+
+
+                                      
+  bleTriggerService = pServer->createService(BEHAVIOUR_TRIGGER_SERVICE_UUID);
+  blePrescriptTriggerChracteristic = bleTriggerService->createCharacteristic(
+                                         BEHAVIOUR_PRESCRIPT_TRIGGER_CHARACTERISTIC_UUID,
+                                         BLECharacteristic::PROPERTY_READ |
+                                         BLECharacteristic::PROPERTY_WRITE
+                                       );
+  blePrescriptTriggerChracteristic->setCallbacks(new PrescriptBehaviourTriggerCallbacks());
+  bleTriggerService->start();
   // BLEDescriptor desc = bmeHumidityDescriptor(BLEUUID((uint16_t)0x2903));
   // TODO
-  // pCharacteristic->addDescriptor("Description for this service");
+  // bleCentredMessageChracteristic->addDescriptor("Description for this service");
 
   
   /* BLEServer *pServer = BLEDevice::createServer();
-  BLEService *pService = pServer->createService(SERVICE_UUID);
-  BLECharacteristic *pCharacteristic = pService->createCharacteristic(
-                                         CHARACTERISTIC_UUID,
+  BLEService *bleCentredMessageService = pServer->createService(CENTRED_MESSAGE_SERVICE_UUID);
+  BLECharacteristic *bleCentredMessageChracteristic = bleCentredMessageService->createCharacteristic(
+                                         CENTRED_MESSAGE_CHARACTERISTIC_UUID,
                                          BLECharacteristic::PROPERTY_READ |
                                          BLECharacteristic::PROPERTY_WRITE
                                        );*/
 
-  pCharacteristic->setCallbacks(new PrescriptMessageCallbacks());
-  pCharacteristic->setValue("Hello, Hermes.");
-  pService->start();
 
 
 
   //BLEAdvertising *pAdvertising = pServer->getAdvertising();
   BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
-  pAdvertising->addServiceUUID(SERVICE_UUID);
+  pAdvertising->addServiceUUID(CENTRED_MESSAGE_SERVICE_UUID);
   pAdvertising->setScanResponse(true);
   pAdvertising->setMinPreferred(0x06);  // functions that help with iPhone connections issue
   pAdvertising->setMinPreferred(0x12);
   BLEDevice::startAdvertising();
   pAdvertising->start();
-  Serial.println("Characteristic defined! Now you can read it in the Client!");
-
-
-  animateWordDisplay(message, 3, 33);
-  delay(3000);
+  // Serial.println("Characteristic defined! Now you can read it in the Client!");
   
-  displayPrescript("Proselyte", "Drink only orange juice for the next 28 days. Completion will result in promotion to proxy.", true);
-  delay(5000);
-  displayPrescript("Proxy", "Stay at home for the next 8 hours. Congratulations on your promotion.", true);
+  // displayPrescript("Proselyte", "Drink only orange juice for the next 28 days. Completion will result in promotion to proxy.", true);
+  // delay(5000);
+  // displayPrescript("Proxy", "Stay at home for the next 8 hours. Congratulations on your promotion.", true);
 }
 
 void loop()
 {
-  // String value = pCharacteristic->getValue();
+  // String value = bleCentredMessageChracteristic->getValue();
   // Serial.print("The new characteristic value is: ");
   // Serial.println(value.c_str());
-  delay(2000);
+  delay(100);
 }
