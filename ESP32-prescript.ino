@@ -234,9 +234,26 @@ void displayPrescript(String name, String prescript, bool buzzMorse) {
 
 
 /*
-  =================
-  | BLE Callbacks |
-  =================
+  ======================================
+  | BLE Service + Characteristic UUIDs |
+  ======================================
+*/
+
+#define CENTRED_MESSAGE_SERVICE_UUID        "60acc2f2-601b-4c01-aebf-59fe16a578d5"
+#define CENTRED_MESSAGE_CHARACTERISTIC_UUID "9c3cd6b8-5e8f-442d-aff0-87cb8177c43f"
+
+#define PRESCRIPT_SERVICE_UUID                  "3957c02d-314c-4577-9997-fade555fa379"
+#define PRESCRIPT_RECIPIENT_CHARACTERISTIC_UUID "e9c6f69f-7bd8-4e91-9c3e-8b3da89f38a0"
+#define PRESCRIPT_BODY_CHARACTERISTIC_UUID      "7200e2c1-5fa2-48f2-85bc-11082c4cdfbe"
+
+#define BEHAVIOUR_TRIGGER_SERVICE_UUID                  "e1d11d62-b8c8-4c3a-a501-ee8a70257ce6"
+#define BEHAVIOUR_PRESCRIPT_TRIGGER_CHARACTERISTIC_UUID "c00c244d-fdeb-4090-b35a-00c68f1e13bc"
+
+
+/*
+  ================================
+  | BLE Characteristic Callbacks |
+  ================================
 */
 
 class PrescriptMessageCallbacks: public BLECharacteristicCallbacks
@@ -359,21 +376,49 @@ BLEService *deviceVersionService;
 //     }
 // }
 
+
+
 /*
-  ======================================
-  | BLE Service + Characteristic UUIDs |
-  ======================================
+  ==============================
+  | BLE Flow Control Variables |
+  ==============================
 */
 
-#define CENTRED_MESSAGE_SERVICE_UUID        "60acc2f2-601b-4c01-aebf-59fe16a578d5"
-#define CENTRED_MESSAGE_CHARACTERISTIC_UUID "9c3cd6b8-5e8f-442d-aff0-87cb8177c43f"
+bool deviceConnected = false;
+bool advertisingToDevices = false;
 
-#define PRESCRIPT_SERVICE_UUID                  "3957c02d-314c-4577-9997-fade555fa379"
-#define PRESCRIPT_RECIPIENT_CHARACTERISTIC_UUID "e9c6f69f-7bd8-4e91-9c3e-8b3da89f38a0"
-#define PRESCRIPT_BODY_CHARACTERISTIC_UUID      "7200e2c1-5fa2-48f2-85bc-11082c4cdfbe"
+/*
+  ==============================
+  | BLE Flow Control Callbacks |
+  ==============================
+*/
 
-#define BEHAVIOUR_TRIGGER_SERVICE_UUID                  "e1d11d62-b8c8-4c3a-a501-ee8a70257ce6"
-#define BEHAVIOUR_PRESCRIPT_TRIGGER_CHARACTERISTIC_UUID "c00c244d-fdeb-4090-b35a-00c68f1e13bc"
+class ConnectionCallbacks: public BLEServerCallbacks {
+    void onConnect(BLEServer* pServer) {
+      deviceConnected = true;
+    };
+
+    void onDisconnect(BLEServer* pServer) {
+      deviceConnected = false;
+    }
+};
+
+void checkToReconnect()
+{
+  // disconnected so advertise
+  if (!deviceConnected && advertisingToDevices) {
+    delay(500); // give the bluetooth stack the chance to get things ready
+    pServer->startAdvertising(); // restart advertising
+    Serial.println("Disconnected: start advertising");
+    advertisingToDevices = deviceConnected;
+  }
+  // connected so reset boolean control
+  if (deviceConnected && !advertisingToDevices) {
+    // do stuff here on connecting
+    Serial.println("Reconnected");
+    advertisingToDevices = deviceConnected;
+  }
+}
 
 void setup()
 {
@@ -396,6 +441,7 @@ void setup()
 
   BLEDevice::init("Prescript of The Index");
   pServer = BLEDevice::createServer();
+  pServer->setCallbacks(new ConnectionCallbacks());
   
   bleCentredMessageService = pServer->createService(CENTRED_MESSAGE_SERVICE_UUID);
   bleCentredMessageChracteristic = bleCentredMessageService->createCharacteristic(
@@ -446,13 +492,15 @@ void setup()
   pAdvertising->addServiceUUID(CENTRED_MESSAGE_SERVICE_UUID);
   pAdvertising->setScanResponse(true);
   pAdvertising->setMinPreferred(0x06);  // functions that help with iPhone connections issue
-  pAdvertising->setMinPreferred(0x12);
+  // pAdvertising->setMinPreferred(0x12);
   BLEDevice::startAdvertising();
   pAdvertising->start();
 }
 
 void loop()
 {
+  checkToReconnect();
+
   if (triggerPrescriptDisplay) {
     triggerPrescriptDisplay = false;
     displayPrescriptFromCharBufs(prescriptRecipientBuf, prescriptBodyBuf, true);
