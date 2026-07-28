@@ -246,8 +246,9 @@ void displayPrescript(String name, String prescript, bool buzzMorse) {
 #define PRESCRIPT_RECIPIENT_CHARACTERISTIC_UUID "e9c6f69f-7bd8-4e91-9c3e-8b3da89f38a0"
 #define PRESCRIPT_BODY_CHARACTERISTIC_UUID      "7200e2c1-5fa2-48f2-85bc-11082c4cdfbe"
 
-#define BEHAVIOUR_TRIGGER_SERVICE_UUID                  "e1d11d62-b8c8-4c3a-a501-ee8a70257ce6"
-#define BEHAVIOUR_PRESCRIPT_TRIGGER_CHARACTERISTIC_UUID "c00c244d-fdeb-4090-b35a-00c68f1e13bc"
+#define BEHAVIOUR_TRIGGER_SERVICE_UUID                     "e1d11d62-b8c8-4c3a-a501-ee8a70257ce6"
+#define BEHAVIOUR_PRESCRIPT_TRIGGER_CHARACTERISTIC_UUID    "c00c244d-fdeb-4090-b35a-00c68f1e13bc"
+#define BEHAVIOUR_TRIGGER_CLEAR_SCREEN_CHARACTERISTIC_UUID "276fb7fe-24af-48c6-9d9a-56a40a890bd9"
 
 
 /*
@@ -331,6 +332,18 @@ class PrescriptBehaviourTriggerCallbacks: public BLECharacteristicCallbacks
   }
 };
 
+class PrescriptClearOutputsCallbacks: public BLECharacteristicCallbacks
+{
+  void onRead(BLECharacteristic *bleCentredMessageChracteristic)
+  {
+    // TODO: Migrate to system where current function is checked after every character to cut off mid-display.
+    // triggerPrescriptDisplay = false;
+    oled.clearDisplay();
+    oled.display();
+    digitalWrite(buzzerPin, LOW); 
+  }
+};
+
 /*
   ================================
   | BLE Component pre-allocation |
@@ -351,6 +364,7 @@ BLECharacteristic *blePrescriptBodyChracteristic;
 
 BLEService *bleTriggerService;
 BLECharacteristic *blePrescriptTriggerChracteristic;
+BLECharacteristic *bleClearOutputsCharacteristic;
 
 
 BLEService *deviceVersionService;
@@ -478,10 +492,15 @@ void setup()
   bleTriggerService = pServer->createService(BEHAVIOUR_TRIGGER_SERVICE_UUID);
   blePrescriptTriggerChracteristic = bleTriggerService->createCharacteristic(
                                          BEHAVIOUR_PRESCRIPT_TRIGGER_CHARACTERISTIC_UUID,
-                                         BLECharacteristic::PROPERTY_READ |
-                                         BLECharacteristic::PROPERTY_WRITE
+                                         BLECharacteristic::PROPERTY_READ
                                        );
   blePrescriptTriggerChracteristic->setCallbacks(new PrescriptBehaviourTriggerCallbacks());
+
+  bleClearOutputsCharacteristic = bleTriggerService->createCharacteristic(
+                                         BEHAVIOUR_TRIGGER_CLEAR_SCREEN_CHARACTERISTIC_UUID,
+                                         BLECharacteristic::PROPERTY_READ
+                                       );
+  bleClearOutputsCharacteristic->setCallbacks(new PrescriptClearOutputsCallbacks());                                   
   bleTriggerService->start();
 
 
