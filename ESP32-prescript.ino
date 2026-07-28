@@ -23,6 +23,10 @@
 #include <BLEUtils.h>
 #include <BLEServer.h>
 
+// TODO: Add PoC for playind Wave file
+#define SND_PRESCRIPT_AUDIO_0001PRESCRIPT_QUICK_BEEPS           1 /* Prescript Audio/0001prescript_quick_beeps.wav */
+#define SND_PRESCRIPT_AUDIO_0002PRESCRIPT_CONFIRM               2 /* Prescript Audio/0002prescript_confirm.wav */
+
 
 const int SCREEN_WIDTH = 128;
 const int SCREEN_HEIGHT = 64;
@@ -89,6 +93,9 @@ String message = "_CLEAR._";
 
 const int ledPin = 8; 
 const int buzzerPin = 20;
+
+// Used to Start displaying the prescript while avoiding a delay on BLE response
+bool triggerPrescriptDisplay = false;
 
 
 /*
@@ -301,9 +308,9 @@ class PrescriptTaskBodyCallbacks: public BLECharacteristicCallbacks
 
 class PrescriptBehaviourTriggerCallbacks: public BLECharacteristicCallbacks
 {
-  void onWrite(BLECharacteristic *bleCentredMessageChracteristic)
+  void onRead(BLECharacteristic *bleCentredMessageChracteristic)
   {
-    displayPrescriptFromCharBufs(prescriptRecipientBuf, prescriptBodyBuf, true);
+    triggerPrescriptDisplay = true;
   }
 };
 
@@ -446,5 +453,9 @@ void setup()
 
 void loop()
 {
+  if (triggerPrescriptDisplay) {
+    triggerPrescriptDisplay = false;
+    displayPrescriptFromCharBufs(prescriptRecipientBuf, prescriptBodyBuf, true);
+  }
   delay(100);
 }
